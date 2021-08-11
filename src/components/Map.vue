@@ -7,39 +7,37 @@
     @map-was-initialized="mapInitialized"
     @click="onClick"
   >
-    <ymap-marker :coords="markerCoords" marker-id="1"></ymap-marker>
+
   </yandex-map>
 </template>
 
 <script>
-import { yandexMap, loadYmap, ymapMarker } from 'vue-yandex-maps';
+import { yandexMap, loadYmap } from 'vue-yandex-maps';
+import { mapMutations } from 'vuex';
 
-const coordinates = require('../coordinates.json');
+const config = require('../config.json');
 
 export default {
   name: 'Map',
   components: {
     yandexMap,
-    ymapMarker,
   },
   async mounted() {
-    await loadYmap({ apiKey: 'cddd8039-fd64-4614-8915-8a38cf2dc192', debug: true });
+    await loadYmap(config.yamaps);
   },
   data: () => ({
-    settings: {
-      apiKey: 'cddd8039-fd64-4614-8915-8a38cf2dc192',
-    },
+    settings: config.yamaps,
     coords: [55.73, 37.75],
     markerCoords: [],
     zoom: 9,
     map: null,
   }),
   methods: {
-    // eslint-disable-next-line no-unused-vars
+    ...mapMutations(['addBaloon']),
     mapInitialized(instance) {
       this.map = instance;
       // eslint-disable-next-line no-undef
-      const polygon = new ymaps.Polygon(coordinates.coordinates);
+      const polygon = new ymaps.Polygon(config.coordinates);
       polygon.options.set('visible', true);
       this.map.geoObjects.add(polygon);
     },
@@ -48,30 +46,34 @@ export default {
     },
   },
   watch: {
-    // eslint-disable-next-line no-unused-vars
     markerCoords(newVal) {
-      // eslint-disable-next-line no-undef
       const closestPoint = this.map.geoObjects
         .get(0)
         .geometry
         .getClosest(newVal).position;
+
+      this.addBaloon(newVal);
+
       this.map.geoObjects.splice(1, this.map.geoObjects.getLength());
       // eslint-disable-next-line no-undef
-      ymaps.route([newVal, closestPoint]).then((res) => {
-        res.getPaths().options.set({
-          strokeColor: 'ff0000',
+      ymaps.route([newVal, closestPoint], { reverseGeocoding: true }).then((res) => {
+        res.getWayPoints().each((point) => {
+          point.options.set({
+            // eslint-disable-next-line no-undef
+            iconContentLayout: ymaps.templateLayoutFactory.createClass('{{ properties.request|raw }}'),
+          });
         });
-        // this.map.geoObjects.each((geoObject) => {
-        // this.map.geoObjecs.remove(geoObject);
-        // console.log(geoObject.properties.get('type'));
-        // console.log(geoObject);
-        // });
+        res.getPaths().options.set({
+          strokeColor: 'ff00ff',
+        });
         this.map.geoObjects.add(res);
       });
       // eslint-disable-next-line no-undef
-      this.map.geoObjects.add(new ymaps.Polyline([newVal, closestPoint], { strokeColor: '#000000' }));
-      // console.log(polygon.getClosestPoint(newVal));
-      // ymaps.route(newVal);
+      this.map.geoObjects.add(new ymaps.Polyline([newVal, closestPoint], {},
+        {
+          strokeColor: '000',
+          strokeStyle: 'dash',
+        }));
     },
   },
 };

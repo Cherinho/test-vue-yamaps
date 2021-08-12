@@ -7,12 +7,12 @@
     @map-was-initialized="mapInitialized"
     @click="onClick"
   >
-
+    <ymap-marker :coords="markerCoords" marker-id="1"></ymap-marker>
   </yandex-map>
 </template>
 
 <script>
-import { yandexMap, loadYmap } from 'vue-yandex-maps';
+import { yandexMap, loadYmap, ymapMarker } from 'vue-yandex-maps';
 import { mapMutations } from 'vuex';
 
 const config = require('../config.json');
@@ -21,6 +21,7 @@ export default {
   name: 'Map',
   components: {
     yandexMap,
+    ymapMarker,
   },
   async mounted() {
     await loadYmap(config.yamaps);
@@ -61,16 +62,42 @@ export default {
       ymaps.route([newVal, closestPoint], { reverseGeocoding: true }).then((res) => {
         this.groundDistance = Math.ceil(res.getLength() / 1000);
         console.log(`Ground distance to MKAD - ${this.groundDistance} km`);
-        res.getWayPoints().each((point) => {
-          point.options.set({
-            // eslint-disable-next-line no-undef
-            iconContentLayout: ymaps.templateLayoutFactory.createClass('{{ properties.request|raw }}'),
-          });
+      });
+      // eslint-disable-next-line no-undef
+      ymaps.geocode(newVal, { json: true, results: 1 }).then((res) => {
+        // eslint-disable-next-line max-len
+        console.log(`Address:${res.GeoObjectCollection.featureMember[0].GeoObject.metaDataProperty.GeocoderMetaData.text}`);
+      });
+      // eslint-disable-next-line no-undef
+      ymaps.route([newVal, this.coords]).then((res) => {
+        // eslint-disable-next-line no-undef
+        const pathsObjects = ymaps.geoQuery(res.getPaths());
+        const edges = [];
+        const moscowPolygon = this.map.geoObjects.get(0);
+
+        pathsObjects.each((path) => {
+          const coordinates = path.geometry.getCoordinates();
+          // eslint-disable-next-line no-plusplus
+          for (let i = 1, l = coordinates.length; i < l; i++) {
+            const point = [coordinates[i], coordinates[i - 1]];
+            if (!moscowPolygon.geometry.contains(point[0])) {
+              edges.push({
+                type: 'LineString',
+                coordinates: point,
+              });
+            }
+          }
         });
-        res.getPaths().options.set({
-          strokeColor: 'ff00ff',
+
+        // eslint-disable-next-line no-undef
+        const routeObjects = ymaps.geoQuery(edges)
+          .add(res.getViaPoints())
+          .addToMap(this.map);
+
+        routeObjects.setOptions({
+          strokeColor: '#0010ff',
+          preset: 'islands#blueIcon',
         });
-        this.map.geoObjects.add(res);
       });
       // eslint-disable-next-line no-undef
       const line = new ymaps.geometry.LineString([newVal, closestPoint]);

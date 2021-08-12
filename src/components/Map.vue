@@ -31,6 +31,8 @@ export default {
     markerCoords: [],
     zoom: 9,
     map: null,
+    airDistance: null,
+    groundDistance: null,
   }),
   methods: {
     ...mapMutations(['addBaloon']),
@@ -57,6 +59,8 @@ export default {
       this.map.geoObjects.splice(1, this.map.geoObjects.getLength());
       // eslint-disable-next-line no-undef
       ymaps.route([newVal, closestPoint], { reverseGeocoding: true }).then((res) => {
+        this.groundDistance = Math.ceil(res.getLength() / 1000);
+        console.log(`Ground distance to MKAD - ${this.groundDistance} km`);
         res.getWayPoints().each((point) => {
           point.options.set({
             // eslint-disable-next-line no-undef
@@ -69,11 +73,12 @@ export default {
         this.map.geoObjects.add(res);
       });
       // eslint-disable-next-line no-undef
-      this.map.geoObjects.add(new ymaps.Polyline([newVal, closestPoint], {},
-        {
-          strokeColor: '000',
-          strokeStyle: 'dash',
-        }));
+      const line = new ymaps.geometry.LineString([newVal, closestPoint]);
+      // eslint-disable-next-line no-undef
+      const geoObject = new ymaps.GeoObject({ geometry: line }, { strokeColor: '000000', strokeStyle: 'dash' });
+      this.map.geoObjects.add(geoObject);
+      this.airDistance = Math.ceil(geoObject.geometry.getDistance() / 1000);
+      console.log(`Air distance to MKAD - ${this.airDistance} km`);
     },
   },
 };
